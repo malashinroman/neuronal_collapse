@@ -88,11 +88,40 @@ def compute_Sigma_B(class_means, global_mean):
     return Sigma_B
 
 
-# fails on CIFAR100 therefore the cpu version is used
-# Pytorch (+gpu) fails (returns incorrect result) on CIFAR100 probably because of the size of the tensors
-def within_class_metric_from_covs_gpu(Sigma_W, Sigma_B, n_classes):
+def compute_pseudo_inverse_pytorch(Sigma_B, num_classes):
+    """
+    Computes the approximate inverse of the between-class covariance
+    matrix using truncated SVD and assumption of symetry.
+
+    Args:
+    Sigma_B (torch.Tensor): Between-class covariance matrix.
+    num_classes (int): Number of classes.
+
+    Returns:
+    torch.Tensor: Approximate inverse of the between-class covariance matrix.
+    """
+    # Perform full SVD on Sigma_B
+    # Here we don't use V under assumption that Sigma_B is symmetric (true for covariance matrix)
+    U, singular_values, _ = torch.svd(Sigma_B)
+
+    # Select the largest (num_classes - 1) singular values and their corresponding vectors (for stability)
+    U_truncated = U[:, : num_classes - 1]
+    singular_values_truncated = singular_values[: num_classes - 1]
+
+    # Compute the inverse of the selected singular values
+    singular_values_inv = torch.diag(1.0 / singular_values_truncated)
+
+    # Compute the approximate inverse of Sigma_B
+    Sigma_B_pseudo_inverse = U_truncated @ singular_values_inv @ U_truncated.T
+
+    return Sigma_B_pseudo_inverse
+
+
+# Computation with the use of pytorch and inverse for near singula values (more stable)
+def within_class_metric_from_covmats_gpu(Sigma_W, Sigma_B, n_classes):
     # Invert Sigma_B
-    Sigma_B_pinv = torch.pinverse(Sigma_B)
+    # Sigma_B_pinv = torch.pinverse(Sigma_B)
+    Sigma_B_pinv = compute_pseudo_inverse_pytorch(Sigma_B, n_classes)
 
     # Compute the product of Sigma_W and Sigma_B_pinv
     product = Sigma_W @ Sigma_B_pinv
@@ -106,7 +135,8 @@ def within_class_metric_from_covs_gpu(Sigma_W, Sigma_B, n_classes):
     return res.item()
 
 
-def within_class_metric_from_covs_cpu(Sigma_W, Sigma_B, n_classes):
+# compute inverse with the use of numpy (less stable)
+def within_class_metric_from_covmats_cpu(Sigma_W, Sigma_B, n_classes):
     """
     Given the within-class covariance matrix Sigma_W
     and the between-class covariance matrix Sigma_B,
@@ -146,7 +176,7 @@ def estimate_withing_class_variation(
 
     # The next block is not necessary for the computation of the metric,
     # Equivalence according to multivariate statisticts,
-    # On gpu sometimes it fails fom time to time (for some reason)
+    # On gpu sometimes it fails fom time to time (probably due to poor conditioning of the matrices)
     # but it is useful for debugging issues with gpu
     Sigma_T = ((features - global_mean).T @ (features - global_mean)) / len(
         targets
@@ -155,10 +185,14 @@ def estimate_withing_class_variation(
         Sigma_T, Sigma_W + Sigma_B
     ), "Sigma_T != Sigma_W + Sigma_B"
 
-    res_cpu = within_class_metric_from_covs_cpu(
-        Sigma_W.cpu(), Sigma_B.cpu(), len(unique_classes)
+    # res_cpu = within_class_metric_from_covs_cpu(
+    #     Sigma_W.cpu(), Sigma_B.cpu(), len(unique_classes)
+    # )
+
+    res_gpu = within_class_metric_from_covmats_gpu(
+        Sigma_W, Sigma_B, len(unique_classes)
     )
-    return res_cpu
+    return res_gpu
 
 
 def estimate_equinormity(normalized_class_vectors):
