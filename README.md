@@ -4,7 +4,7 @@ This repository contains an unofficial implementation of the paper "[Prevalence 
 
 ## Overview
 
-Neural Collapse (NC) refers to a phenomenon observed in deep learning where neural network last-layer classirier and features align during the final stages of training. Reproducing this effect accurately requires careful adjustment of training parameters, including a class-balanced dataset, appropriate (or absence of) augmentation, learning rate scheduling, and specific network architectures. Different papers use various metrics to estimate NC, which may lead to different conclusions, especially in non-ideal collapse conditions.
+Neural Collapse (NC) refers to a phenomenon observed in deep learning where neural network last-layer classifiers and features align during the final stages of training. Reproducing this effect accurately requires careful adjustment of training parameters, including a class-balanced dataset, appropriate (or absence of) augmentation, learning rate scheduling, and specific network architectures. Different papers use various metrics to estimate NC, which may lead to different conclusions, especially in non-ideal collapse conditions.
 
 This code accurately reproduces the experiments from the original paper on CIFAR-10 and CIFAR-100 datasets using ResNet-18 and ResNet-50 architectures, respectively, as suggested by the authors. It replicates Figures 2 through 7 from the paper.
 
